@@ -6,20 +6,27 @@ using Modeling1;
 
 var arguments = Environment.GetCommandLineArgs();
 
+using var context = new AppDbContext() ?? throw new ArgumentNullException(nameof(AppDbContext));
+
+var stopWatch = new Stopwatch();
+
 try
 {
-    using var context = new AppDbContext();
-
     await context.Database.MigrateAsync();
 
-    if (arguments.Length > 1 && arguments[1] == "seed")
+    if (arguments.Length > 1 && arguments[1] == "--seed")
     {
+        Console.WriteLine("Seeding data...");
         await context.CleanData();
+        stopWatch.Start();
         await context.SeedData();
-        Console.WriteLine("Data seeded");
+        stopWatch.Stop();
+        Console.WriteLine($"Data seeded in {stopWatch.Elapsed.TotalSeconds} s");
+        Console.WriteLine();
+        stopWatch.Reset();
     }
 
-    await ExecuteQuery(context);
+    await ExecuteQuery();
 }
 catch (Exception ex)
 {
@@ -27,37 +34,62 @@ catch (Exception ex)
 }
 
 
-async Task ExecuteQuery(AppDbContext context)
+async Task ExecuteQuery()
 {
-    var stopWatch = new Stopwatch();
-    stopWatch.Start();
+    Console.WriteLine("Executing query...");
 
-    var query = context.Products
+    stopWatch.Start();
+    var gcBefore = GC.CollectionCount(0);
+
+    var query = context?.Products
         .Include(x => x.Category)
         .Include(x => x.BranchProducts)
-        .Where(x => 
+        .Where(x =>
             x.Customer.Document == "0123456789" &&
             x.BranchProducts.Any(y => y.WasSentToCatalog == false))
-        .AsNoTracking();
+        .AsNoTracking()
+        .AsSplitQuery()
+        ?? throw new ArgumentNullException("query");
 
     var products = await query.ToListAsync();
 
-    stopWatch.Stop();
+    stopWatch.Stop();    
 
+    await PrintResult(
+        stopWatch,
+        gcBefore,
+        totalProducts: products.Count,
+        totalBranches: products.Sum(x => x.BranchProducts.Count));
+
+    stopWatch.Reset();
+
+    await Continue();
+}
+
+
+Task PrintResult(Stopwatch stopWatch, long gcBefore, int totalProducts, int totalBranches)
+{
     var message = new StringBuilder();
-    message.AppendLine($"Total products: {products.Count}");
-    message.AppendLine($"Total branches: {products.Sum(x => x.BranchProducts.Count)}");
-    message.AppendLine($"Query executed in: ");
-    message.AppendLine($"{stopWatch.Elapsed.TotalMilliseconds} ms");
-    message.AppendLine($"{stopWatch.Elapsed.TotalSeconds} s");    
+    message.AppendLine($"Total products: {totalProducts}");
+    message.AppendLine($"Total branches: {totalBranches}");
+    message.AppendLine($"Query executed in: {stopWatch.Elapsed.TotalMilliseconds} ms ({stopWatch.Elapsed.TotalSeconds} s)");
+    message.AppendLine($"Memory used: {GC.GetTotalMemory(false) / 1024 / 1024} MB");
+    message.AppendLine($"Garbage collections: {GC.CollectionCount(0) - gcBefore}");
 
     Console.WriteLine(message.ToString());
 
-    Console.WriteLine("Executar novamente? (S/N)");
+    return Task.CompletedTask;
+}
+
+Task Continue()
+{
+    Console.WriteLine("Execute query again? (S/N)");
     var key = Console.ReadKey();
     if (key.Key == ConsoleKey.S)
     {
         Console.WriteLine();
-        await ExecuteQuery(context);
-    }    
+        return ExecuteQuery();
+    }
+
+    return Task.CompletedTask;
 }
