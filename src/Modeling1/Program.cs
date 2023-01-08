@@ -43,17 +43,16 @@ async Task ExecuteQuery()
 
     var query = context?.Products
         .Include(x => x.Category)
-        .Include(x => x.BranchProducts)
         .Where(x =>
             x.Customer.Document == "0123456789" &&
-            x.BranchProducts.Any(y => y.WasSentToCatalog == false))
+            x.BranchProducts.Any(y => y.WasSentToCatalog == false) &&
+            x.Category.CodeCatalog != null)
         .AsNoTracking()
-        .AsSplitQuery()
         ?? throw new ArgumentNullException("query");
 
     var products = await query.ToListAsync();
 
-    stopWatch.Stop();    
+    stopWatch.Stop();
 
     await PrintResult(
         stopWatch,

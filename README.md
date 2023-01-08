@@ -24,4 +24,5 @@ dotnet run --project src/Modeling1/Modeling1.csproj --seed
     
 ```bash
 dotnet ef migrations add InitialCreate --project src/Modeling1/Modeling1.csproj -o Migrations
+dotnet ef migrations add InitialCreate --project src/Modeling2/Modeling2.csproj -o Migrations
 ```

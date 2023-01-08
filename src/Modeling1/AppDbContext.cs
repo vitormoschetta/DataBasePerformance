@@ -34,6 +34,6 @@ public class AppDbContext : DbContext
 
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
     {
-        optionsBuilder.UseNpgsql("Host=localhost;Database=postgres;Username=modeling1;Password=modeling1;Application Name=Modeling1;CommandTimeout=30");
+        optionsBuilder.UseNpgsql("Host=localhost;Database=modeling1;Username=modeling1;Password=modeling1;Application Name=Modeling1;CommandTimeout=30");
     }
 }
