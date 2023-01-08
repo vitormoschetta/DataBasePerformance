@@ -41,16 +41,33 @@ async Task ExecuteQuery()
     stopWatch.Start();
     var gcBefore = GC.CollectionCount(0);
 
-    var query = context?.Products
+    var products = await context.Products
         .Include(x => x.Category)
         .Where(x =>
             x.Customer.Document == "0123456789" &&
             x.BranchProducts.Any(y => y.WasSentToCatalog == false) &&
             x.Category.CodeCatalog != null)
         .AsNoTracking()
-        ?? throw new ArgumentNullException("query");
+        .ToListAsync();
 
-    var products = await query.ToListAsync();
+    var branchs = await context.Branches.Where(x => x.Customer.Document == "0123456789").ToListAsync();
+
+    foreach (var branch in branchs)
+    {
+        var request = new
+        {
+            Document = branch.Document,
+            Items = products.Where(x => x.BranchProducts.Any(y => y.BranchId == branch.Id))
+                .Select(x => new
+                {
+                    Code = x.Code,
+                    Category = x.Category.CodeCatalog,
+                    Name = x.Name,
+                    Description = x.Description,
+                    Price = x.Price                    
+                })
+        };
+    }
 
     stopWatch.Stop();
 
